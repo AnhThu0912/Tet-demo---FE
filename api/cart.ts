@@ -1,6 +1,29 @@
-import { Product } from '../types';
+import { Product } from "../types";
 
-const API_BASE_URL = 'http://localhost:3001/api';
+import { API_BASE_URL } from "../config/env";
+
+// Persist a cart token in browser so the same cart can be reused after refresh/reopen
+const CART_TOKEN_KEY = "coffee_shop_cart_token";
+
+const getOrCreateCartToken = (): string => {
+  // In SSR/build-time contexts, window/localStorage may be undefined
+  if (typeof window === "undefined") return "";
+
+  const existing = window.localStorage.getItem(CART_TOKEN_KEY);
+  if (existing) return existing;
+
+  // Simple UUID-ish token (good enough for demo). You can replace with crypto.randomUUID() if you prefer.
+  const token = `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+  window.localStorage.setItem(CART_TOKEN_KEY, token);
+  return token;
+};
+
+const withCartTokenHeaders = (
+  headers: Record<string, string> = {},
+): Record<string, string> => {
+  const token = getOrCreateCartToken();
+  return token ? { ...headers, "X-Cart-Token": token } : headers;
+};
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -32,27 +55,27 @@ export interface CartData {
 export const getCart = async (): Promise<CartData> => {
   try {
     const response = await fetch(`${API_BASE_URL}/cart`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
+      cache: "no-store",
+      headers: withCartTokenHeaders({
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const json = await response.json();
     const cartData: unknown = (json as ApiResponse<CartData>)?.data ?? json;
-    
-    if (cartData && typeof cartData === 'object' && 'items' in cartData) {
+
+    if (cartData && typeof cartData === "object" && "items" in cartData) {
       return cartData as CartData;
     } else {
-      throw new Error('Unexpected cart response shape');
+      throw new Error("Unexpected cart response shape");
     }
   } catch (error) {
-    console.error('Error fetching cart:', error);
+    console.error("Error fetching cart:", error);
     throw error;
   }
 };
@@ -60,35 +83,38 @@ export const getCart = async (): Promise<CartData> => {
 /**
  * Thêm/Update sản phẩm vào giỏ hàng
  */
-export const addToCart = async (productId: number, quantity: number): Promise<CartData> => {
+export const addToCart = async (
+  productId: number,
+  quantity: number,
+): Promise<CartData> => {
   try {
     const response = await fetch(`${API_BASE_URL}/cart/items`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
+      method: "POST",
+      headers: withCartTokenHeaders({
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      }),
       body: JSON.stringify({
         productId,
         quantity,
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const json = await response.json();
     const cartData: unknown = (json as ApiResponse<CartData>)?.data ?? json;
-    
-    if (cartData && typeof cartData === 'object' && 'items' in cartData) {
+
+    if (cartData && typeof cartData === "object" && "items" in cartData) {
       return cartData as CartData;
     } else {
-      throw new Error('Unexpected cart response shape');
+      throw new Error("Unexpected cart response shape");
     }
   } catch (error) {
-    console.error('Error adding to cart:', error);
+    console.error("Error adding to cart:", error);
     throw error;
   }
 };
@@ -96,34 +122,37 @@ export const addToCart = async (productId: number, quantity: number): Promise<Ca
 /**
  * Cập nhật số lượng sản phẩm trong giỏ hàng
  */
-export const updateCartItem = async (productId: number, quantity: number): Promise<CartData> => {
+export const updateCartItem = async (
+  productId: number,
+  quantity: number,
+): Promise<CartData> => {
   try {
     const response = await fetch(`${API_BASE_URL}/cart/items/${productId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
+      method: "PATCH",
+      headers: withCartTokenHeaders({
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      }),
       body: JSON.stringify({
         quantity,
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const json = await response.json();
     const cartData: unknown = (json as ApiResponse<CartData>)?.data ?? json;
-    
-    if (cartData && typeof cartData === 'object' && 'items' in cartData) {
+
+    if (cartData && typeof cartData === "object" && "items" in cartData) {
       return cartData as CartData;
     } else {
-      throw new Error('Unexpected cart response shape');
+      throw new Error("Unexpected cart response shape");
     }
   } catch (error) {
-    console.error('Error updating cart item:', error);
+    console.error("Error updating cart item:", error);
     throw error;
   }
 };
@@ -134,27 +163,27 @@ export const updateCartItem = async (productId: number, quantity: number): Promi
 export const removeCartItem = async (productId: number): Promise<CartData> => {
   try {
     const response = await fetch(`${API_BASE_URL}/cart/items/${productId}`, {
-      method: 'DELETE',
-      headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
+      method: "DELETE",
+      headers: withCartTokenHeaders({
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const json = await response.json();
     const cartData: unknown = (json as ApiResponse<CartData>)?.data ?? json;
-    
-    if (cartData && typeof cartData === 'object' && 'items' in cartData) {
+
+    if (cartData && typeof cartData === "object" && "items" in cartData) {
       return cartData as CartData;
     } else {
-      throw new Error('Unexpected cart response shape');
+      throw new Error("Unexpected cart response shape");
     }
   } catch (error) {
-    console.error('Error removing cart item:', error);
+    console.error("Error removing cart item:", error);
     throw error;
   }
 };

@@ -2,21 +2,23 @@ import React, { useState, useEffect } from "react";
 import { Category, Product } from "../types";
 import { getProductsWithParams } from "../api/products";
 import { formatVND } from "../utils/format";
+import { API_ORIGIN } from "../config/env";
 
 interface StoreProps {
   onAddToCart: (product: Product) => void;
   onViewDetails: (product: Product) => void;
 }
 
+const resolveImageSrc = (src?: string) => {
+  if (!src) return "https://via.placeholder.com/800x600?text=No+Image";
+  if (/^https?:\/\//i.test(src)) return src;
+  return `${API_ORIGIN}${src.startsWith("/") ? "" : "/"}${src}`;
+};
+
 const ITEMS_PER_PAGE = 12;
 // Data URI: ảnh placeholder nội bộ, không gọi mạng (tránh ERR_NAME_NOT_RESOLVED)
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect fill='%23e5e7eb' width='400' height='400'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='16' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3ENo image%3C/text%3E%3C/svg%3E";
-
-const getImageSrc = (image: string | undefined): string => {
-  if (!image || image.trim() === "") return PLACEHOLDER_IMAGE;
-  return image;
-};
 
 const Store: React.FC<StoreProps> = ({ onAddToCart, onViewDetails }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -128,12 +130,12 @@ const Store: React.FC<StoreProps> = ({ onAddToCart, onViewDetails }) => {
                   {cat === "all"
                     ? "Tất cả"
                     : cat === "food"
-                    ? "Món ăn"
-                    : cat === "drink"
-                    ? "Thức uống"
-                    : "Trò chơi"}
+                      ? "Món ăn"
+                      : cat === "drink"
+                        ? "Thức uống"
+                        : "Trò chơi"}
                 </button>
-              )
+              ),
             )}
           </div>
 
@@ -149,7 +151,7 @@ const Store: React.FC<StoreProps> = ({ onAddToCart, onViewDetails }) => {
                 value={minPrice}
                 onChange={(e) =>
                   setMinPrice(
-                    e.target.value === "" ? "" : Number(e.target.value)
+                    e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
               />
@@ -161,7 +163,7 @@ const Store: React.FC<StoreProps> = ({ onAddToCart, onViewDetails }) => {
                 value={maxPrice}
                 onChange={(e) =>
                   setMaxPrice(
-                    e.target.value === "" ? "" : Number(e.target.value)
+                    e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
               />
@@ -211,7 +213,7 @@ const Store: React.FC<StoreProps> = ({ onAddToCart, onViewDetails }) => {
               >
                 <div className="relative overflow-hidden h-56 rounded-t-2xl">
                   <img
-                    src={getImageSrc(p.image)}
+                    src={resolveImageSrc(p.image)}
                     alt={p.name}
                     className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ${
                       !p.isActive && "grayscale opacity-60"

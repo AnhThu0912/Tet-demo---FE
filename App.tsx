@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -19,13 +20,16 @@ import {
   CartSummary,
 } from "./api/cart";
 import { checkoutOrder } from "./api/orders";
+import { AuthData, getAuthData, setAuthData, clearAuthData } from "./utils/auth";
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activePage, setActivePage] = useState("home");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartSummary, setCartSummary] = useState<CartSummary | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [auth, setAuth] = useState<AuthData | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [notifications, setNotifications] = useState<{
     msg: string;
@@ -33,12 +37,19 @@ const App: React.FC = () => {
   } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
 
+  useEffect(() => {
+    const existing = getAuthData();
+    if (existing) {
+      setAuth(existing);
+    }
+  }, []);
+
   const addNotification = useCallback(
     (msg: string, type: "success" | "error" = "success") => {
       setNotifications({ msg, type });
       setTimeout(() => setNotifications(null), 3500);
     },
-    []
+    [],
   );
 
   // Helper: convert API CartItem sang UI CartItem. Đọc cả lineTotal/line_total để suy đơn giá nếu product không có price.
@@ -77,6 +88,16 @@ const App: React.FC = () => {
     return { ...product, quantity };
   };
 
+  // When returning from payment result with "Xem đơn hàng", open orders tab and trigger refetch
+  const [refreshOrdersKey, setRefreshOrdersKey] = useState(0);
+  useEffect(() => {
+    const state = location.state as { openPage?: string } | null;
+    if (state?.openPage === "orders") {
+      setActivePage("orders");
+      setRefreshOrdersKey((k) => k + 1);
+    }
+  }, [location.state]);
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -108,13 +129,24 @@ const App: React.FC = () => {
   }, []);
 
   const handleAddToCart = async (product: Product, quantity: number = 1) => {
+    if (!auth) {
+      addNotification("Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng.", "error");
+      setActivePage("login");
+      return;
+    }
     try {
-      // Tìm item hiện tại trong cart để tính quantity mới
       const existing = cartItems.find((item) => item.id === product.id);
-      const newQuantity = existing ? existing.quantity + quantity : quantity;
 
-      // Gọi API để thêm/update cart
-      const cartData = await addToCart(product.id, newQuantity);
+      let cartData;
+      if (existing) {
+        // Sản phẩm đã có trong giỏ: cập nhật số lượng tuyệt đối
+        const newQuantity = existing.quantity + quantity;
+        cartData = await updateCartItem(product.id, newQuantity);
+      } else {
+        // Sản phẩm chưa có trong giỏ: thêm mới
+        cartData = await addToCart(product.id, quantity);
+      }
+
       setCartItems(cartData.items.map(convertApiCartItemToUiCartItem));
       setCartSummary(cartData.summary ?? null);
 
@@ -159,11 +191,19 @@ const App: React.FC = () => {
   };
 
   const handleSubmitOrder = async () => {
+    if (!auth) {
+      addNotification(
+        "Bạn cần đăng nhập để đặt hàng và lưu đơn vào tài khoản.",
+        "error",
+      );
+      setActivePage("login");
+      return;
+    }
     try {
       const res = await checkoutOrder();
       addNotification(
         res.message ?? "Xuân này sum vầy! Đặt hàng thành công!",
-        "success"
+        "success",
       );
       setCartItems([]);
       setCartSummary(null);
@@ -175,15 +215,27 @@ const App: React.FC = () => {
         error instanceof Error
           ? error.message
           : "Không thể đặt hàng. Vui lòng thử lại.",
-        "error"
+        "error",
       );
     }
   };
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    setActivePage("admin");
-    addNotification("Kính chào chủ quán trở lại hệ thống!");
+  const handleLoginSuccess = (data: AuthData) => {
+    setAuth(data);
+    setAuthData(data);
+    addNotification(
+      data.user.role === "admin"
+        ? "Đăng nhập admin thành công."
+        : "Đăng nhập người dùng thành công.",
+    );
+    setActivePage(data.user.role === "admin" ? "admin" : "home");
+  };
+
+  const handleLogout = () => {
+    clearAuthData();
+    setAuth(null);
+    setActivePage("home");
+    addNotification("Đã đăng xuất khỏi hệ thống.");
   };
 
   const handleViewDetails = async (product: Product) => {
@@ -217,22 +269,51 @@ const App: React.FC = () => {
           />
         );
       case "login":
-        return isAuthenticated ? (
-          <Admin initialProducts={products} />
-        ) : (
-          <Login onLogin={handleLogin} />
-        );
+        return <Login onLoginSuccess={handleLoginSuccess} />;
       case "admin":
-        return isAuthenticated ? (
+        return auth?.user.role === "admin" ? (
           <Admin initialProducts={products} />
         ) : (
-          <Login onLogin={handleLogin} />
+          <Home
+            products={products}
+            onNavigate={setActivePage}
+            onAddToCart={handleQuickAdd}
+          />
         );
       case "orders":
+        if (!auth) {
+          return (
+            <div className="min-h-screen bg-[#FFFDF5] flex items-center justify-center px-4">
+              <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-red-100 p-8 text-center">
+                <h2 className="text-xl font-bold text-red-600 mb-2">
+                  Bạn cần đăng nhập để xem đơn hàng
+                </h2>
+                <p className="text-sm text-gray-600 mb-6">
+                  Vui lòng đăng nhập bằng tài khoản user để xem lịch sử đơn hàng của bạn.
+                </p>
+                <button
+                  onClick={() => setActivePage("login")}
+                  className="px-6 py-2.5 rounded-xl bg-tet-red text-white font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Đăng nhập ngay
+                </button>
+              </div>
+            </div>
+          );
+        }
+        const orderState = location.state as {
+          openPage?: string;
+          justPaidOrderId?: number;
+        } | null;
         return (
           <Orders
+            key={refreshOrdersKey}
+            justPaidOrderId={orderState?.justPaidOrderId}
             onNavigate={setActivePage}
             onNotify={addNotification}
+            onNavigateToPayment={(paymentId, orderId) =>
+              navigate(`/payment/${paymentId}?orderId=${orderId}`)
+            }
           />
         );
       default:
@@ -248,7 +329,13 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FFFDF5]">
-      <Header onNavigate={setActivePage} activePage={activePage} />
+      <Header
+        onNavigate={setActivePage}
+        activePage={activePage}
+        isAuthenticated={!!auth}
+        isAdmin={auth?.user.role === "admin"}
+        onLogout={handleLogout}
+      />
 
       {/* Toast Notifications */}
       {notifications && (
@@ -267,7 +354,7 @@ const App: React.FC = () => {
       )}
 
       {/* Floating Cart Button */}
-      {cartItems.length > 0 && !isCartOpen && (
+      {!isCartOpen && (
         <button
           onClick={() => setIsCartOpen(true)}
           className="fixed bottom-12 right-12 z-[110] bg-tet-red text-white p-5 rounded-full shadow-2xl border-4 border-tet-gold hover:scale-110 active:scale-95 transition-all stamp-btn group"

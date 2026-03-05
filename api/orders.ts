@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+import { getAuthToken } from "../utils/auth";
+import { API_BASE_URL } from "../config/env";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -63,6 +64,11 @@ export interface OrderDetailData {
   items?: OrderDetailItem[];
 }
 
+const withAuthHeaders = (headers: Record<string, string> = {}): Record<string, string> => {
+  const token = getAuthToken();
+  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+};
+
 /**
  * Đặt hàng: POST /orders/checkout (dùng giỏ hàng hiện tại).
  * Response: { success: true, data: { orderId }, message: "Checkout thành công" }
@@ -70,11 +76,11 @@ export interface OrderDetailData {
 export const checkoutOrder = async (payload?: CheckoutPayload): Promise<CheckoutResponse> => {
   const response = await fetch(`${API_BASE_URL}/orders/checkout`, {
     method: 'POST',
-    headers: {
+    headers: withAuthHeaders({
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
-    },
+    }),
     body: JSON.stringify({
       name: payload?.name ?? '',
       phone: payload?.phone ?? '',
@@ -99,7 +105,7 @@ export const checkoutOrder = async (payload?: CheckoutPayload): Promise<Checkout
 export const getOrders = async (): Promise<OrdersListData> => {
   const response = await fetch(`${API_BASE_URL}/orders`, {
     cache: 'no-store',
-    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    headers: withAuthHeaders({ 'Cache-Control': 'no-cache', Pragma: 'no-cache' }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const json = await response.json();
@@ -114,7 +120,7 @@ export const getOrders = async (): Promise<OrdersListData> => {
 export const getOrderById = async (id: number): Promise<OrderDetailData> => {
   const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
     cache: 'no-store',
-    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    headers: withAuthHeaders({ 'Cache-Control': 'no-cache', Pragma: 'no-cache' }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const json = await response.json();

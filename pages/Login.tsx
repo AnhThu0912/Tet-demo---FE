@@ -1,21 +1,32 @@
 
 import React, { useState } from 'react';
+import { login, LoginResponse } from '../api/auth';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLoginSuccess: (data: LoginResponse) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === 'admin@tet.com' && password === 'admin123') {
-      onLogin();
-    } else {
-      setError('Email hoặc mật khẩu không chính xác. Thử (admin@tet.com / admin123)');
+    setError('');
+    setLoading(true);
+    try {
+      const data = await login(email, password);
+      onLoginSuccess(data);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Đăng nhập thất bại. Vui lòng thử lại.';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,8 +39,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
              </svg>
           </div>
-          <h2 className="text-3xl font-bold heading-serif text-tet-red">Đăng Nhập Quản Trị</h2>
-          <p className="text-gray-500 mt-2 italic">Dành cho chủ gian hàng</p>
+          <h2 className="text-3xl font-bold heading-serif text-tet-red">Đăng Nhập</h2>
+          <p className="text-gray-500 mt-2 italic">Sử dụng tài khoản admin hoặc user</p>
         </div>
         
         <form onSubmit={handleLogin} className="p-8 space-y-6">
@@ -44,7 +55,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <input 
               type="email" 
               className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-tet-red outline-none transition-all"
-              placeholder="admin@tet.com"
+              placeholder="admin@example.com hoặc user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -65,9 +76,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <button 
             type="submit"
-            className="w-full py-4 bg-tet-red text-white font-bold rounded-xl shadow-xl hover:bg-red-700 transition-all stamp-btn text-lg"
+            className="w-full py-4 bg-tet-red text-white font-bold rounded-xl shadow-xl hover:bg-red-700 transition-all stamp-btn text-lg disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={loading}
           >
-            ĐĂNG NHẬP ADMIN
+            {loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}
           </button>
           
           <div className="text-center">

@@ -1,6 +1,6 @@
 import { Product, Category } from '../types';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+import { API_BASE_URL } from "../config/env";
 
 export interface ApiResponse<T> {
   success: boolean;

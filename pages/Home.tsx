@@ -1,5 +1,12 @@
 import React from "react";
+import { API_ORIGIN } from "../config/env";
 import { Category, Product } from "../types";
+
+const resolveImageSrc = (src?: string) => {
+  if (!src) return "https://via.placeholder.com/800x600?text=No+Image";
+  if (/^https?:\/\//i.test(src)) return src;
+  return `${API_ORIGIN}${src.startsWith("/") ? "" : "/"}${src}`;
+};
 
 interface HomeProps {
   onNavigate: (page: string) => void;
@@ -10,7 +17,7 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ onNavigate, onAddToCart, products }) => {
   const topProducts = products.filter((p) => p.isActive).slice(0, 6);
   const games = products.filter(
-    (p) => p.category === Category.GAME && p.isActive
+    (p) => p.category === Category.GAME && p.isActive,
   );
 
   return (
@@ -43,12 +50,14 @@ const Home: React.FC<HomeProps> = ({ onNavigate, onAddToCart, products }) => {
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <button
               onClick={() => onNavigate("store")}
-              className="px-12 py-5 bg-tet-gold text-tet-red font-bold rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all text-xl stamp-btn">
+              className="px-12 py-5 bg-tet-gold text-tet-red font-bold rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all text-xl stamp-btn"
+            >
               Vào Gian Hàng
             </button>
             <button
               onClick={() => onNavigate("store")}
-              className="px-12 py-5 bg-transparent border-2 border-white text-white font-bold rounded-2xl hover:bg-white hover:text-tet-red transition-all text-xl stamp-btn">
+              className="px-12 py-5 bg-transparent border-2 border-white text-white font-bold rounded-2xl hover:scale-105 hover:bg-yellow-500 hover:text-red-500 transition-all text-xl stamp-btn"
+            >
               Mua Nhanh
             </button>
           </div>
@@ -71,12 +80,19 @@ const Home: React.FC<HomeProps> = ({ onNavigate, onAddToCart, products }) => {
           {topProducts.map((p) => (
             <div
               key={p.id}
-              className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all border border-gray-100 p-6 relative group flex flex-col">
+              className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all border border-gray-100 p-6 relative group flex flex-col"
+            >
               <div className="relative h-60 rounded-2xl overflow-hidden mb-6">
                 <img
-                  src={p.image}
+                  src={resolveImageSrc(p.image)}
                   alt={p.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    img.onerror = null;
+                    img.src =
+                      "https://via.placeholder.com/800x600?text=No+Image";
+                  }}
                 />
                 <div className="absolute top-3 left-3">
                   <span className="bg-[#4E342E] text-tet-gold text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">
@@ -100,7 +116,8 @@ const Home: React.FC<HomeProps> = ({ onNavigate, onAddToCart, products }) => {
               </div>
               <button
                 onClick={() => onAddToCart(p)}
-                className="mt-auto w-full py-4 bg-tet-red text-white rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl stamp-btn">
+                className="mt-auto w-full py-4 bg-tet-red text-white rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl stamp-btn"
+              >
                 Thêm vào giỏ
               </button>
             </div>
@@ -129,7 +146,8 @@ const Home: React.FC<HomeProps> = ({ onNavigate, onAddToCart, products }) => {
               <div
                 key={game.id}
                 className="text-center group cursor-pointer bg-white p-8 rounded-[40px] shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all border border-gray-50"
-                onClick={() => onNavigate("store")}>
+                onClick={() => onNavigate("store")}
+              >
                 <div className="w-28 h-28 bg-tet-red rounded-[30px] mx-auto flex items-center justify-center text-tet-gold text-4xl font-bold mb-6 shadow-xl group-hover:rotate-12 transition-transform duration-500 ring-4 ring-tet-gold/10">
                   {game.name[0]}
                 </div>

@@ -6,7 +6,7 @@ import {
   OrderListItem,
   OrderDetailData,
 } from "../api/orders";
-import { createPayment, confirmPayment } from "../api/payments";
+import { createPayment } from "../api/payments";
 
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23e5e7eb' width='80' height='80'/%3E%3C/svg%3E";
@@ -62,11 +62,19 @@ function getItemDisplay(item: {
 }
 
 interface OrdersProps {
+  /** Đơn vừa thanh toán xong (từ payment result) → hiển thị "paid" ngay, ẩn nút Thanh toán */
+  justPaidOrderId?: number | null;
   onNavigate: (page: string) => void;
   onNotify?: (msg: string, type: "success" | "error") => void;
+  onNavigateToPayment?: (paymentId: number, orderId: number) => void;
 }
 
-const Orders: React.FC<OrdersProps> = ({ onNavigate, onNotify }) => {
+const Orders: React.FC<OrdersProps> = ({
+  justPaidOrderId,
+  onNavigate,
+  onNotify,
+  onNavigateToPayment,
+}) => {
   const [orders, setOrders] = useState<OrderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +90,13 @@ const Orders: React.FC<OrdersProps> = ({ onNavigate, onNotify }) => {
     }
     try {
       const data = await getOrders();
-      setOrders(data.items ?? []);
+      let items = data.items ?? [];
+      if (justPaidOrderId != null) {
+        items = items.map((o) =>
+          o.id === justPaidOrderId ? { ...o, status: "paid" } : o,
+        );
+      }
+      setOrders(items);
     } catch (e) {
       if (!silent)
         setError(e instanceof Error ? e.message : "Không tải được đơn hàng");
@@ -94,23 +108,19 @@ const Orders: React.FC<OrdersProps> = ({ onNavigate, onNotify }) => {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [justPaidOrderId]);
 
   const handlePayOrder = async (orderId: number) => {
     setPayingOrderId(orderId);
     try {
-      await createPayment(orderId);
-      await confirmPayment(orderId);
-      await fetchOrders(true);
-      onNotify?.(
-        "Thanh toán thành công! Đơn hàng đã được xác nhận.",
-        "success",
-      );
+      const { paymentId } = await createPayment(orderId);
+      const id = paymentId ?? orderId;
+      onNavigateToPayment?.(id, orderId);
     } catch (e) {
       onNotify?.(
         e instanceof Error
           ? e.message
-          : "Thanh toán thất bại. Vui lòng thử lại.",
+          : "Không thể tạo giao dịch. Vui lòng thử lại.",
         "error",
       );
     } finally {
@@ -201,7 +211,9 @@ const Orders: React.FC<OrdersProps> = ({ onNavigate, onNotify }) => {
                         className={
                           order.status === "pending"
                             ? "text-amber-600 font-medium"
-                            : "text-gray-600"
+                            : order.status === "paid" || order.status === "completed"
+                              ? "text-green-600 font-medium"
+                              : "text-gray-600"
                         }
                       >
                         {order.status}
@@ -215,7 +227,7 @@ const Orders: React.FC<OrdersProps> = ({ onNavigate, onNotify }) => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {order.status === "pending" && (
+                    {order.status === "pending" ? (
                       <button
                         onClick={() => handlePayOrder(order.id)}
                         disabled={payingOrderId === order.id}
@@ -225,7 +237,7 @@ const Orders: React.FC<OrdersProps> = ({ onNavigate, onNotify }) => {
                           ? "Đang xử lý..."
                           : "Thanh toán"}
                       </button>
-                    )}
+                    ) : null}
                     <button
                       onClick={() => openDetail(order.id)}
                       className="px-5 py-2.5 bg-tet-red text-white font-medium rounded-xl hover:bg-red-700 transition-colors stamp-btn"
