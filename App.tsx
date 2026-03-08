@@ -98,6 +98,18 @@ const App: React.FC = () => {
     }
   }, [location.state]);
 
+  // Redirect from LemonSqueezy: ?payment=success
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("payment") === "success") {
+      setActivePage("orders");
+      setRefreshOrdersKey((k) => k + 1);
+      addNotification("Thanh toán thành công! Đơn hàng đang được xử lý.");
+      // Xoá query param khỏi URL
+      navigate("/", { replace: true });
+    }
+  }, [location.search, navigate, addNotification]);
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
